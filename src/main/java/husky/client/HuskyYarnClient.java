@@ -67,7 +67,6 @@ public class HuskyYarnClient {
   private String mLocalResourceHDFSPaths;  // Paths to resources that need to download to working environment
   private String mLocalFiles = "";  // Paths to resources that either locate in client machine or on HDFS
   private String mLocalArchives = "";  // Paths to archives that either locate in client machine or on HDFS
-  private ArrayList<Pair<String, Integer>> mWorkerInfos = new ArrayList<Pair<String, Integer>>();
   // container resources
   private int mAppMasterMemory = 0;
   private int mContainerMemory = 0;  // Memory that can be used by a container
@@ -75,14 +74,13 @@ public class HuskyYarnClient {
   private int mAppPriority = 0;
   // husky application
   private String mMasterExec = "";
-  private String mAppExec = "";
-  private String mConfigFile = "";
-  private String mLdLibraryPath = "";
-  // options
-  // 1. kerberos
-  private String mUserName = "";
-  private String mKeyTabFile = "";
-  // 2. upload log files to hdfs
+  private String mWorkerExec = "";
+  private String mWorkersInfoFile = "";
+  private ArrayList<Pair<String, Integer>> mWorkerInfos = new ArrayList<Pair<String, Integer>>();
+  private String mMasterPort = "";
+  private String mMasterJobListenerPort = "";
+  private String mHdfsNameNodeHost = "";
+  private String mHdfsNameNodePort = "";
   private String mLogPathToHDFS = "";
 
   public HuskyYarnClient() throws IOException {
@@ -112,18 +110,15 @@ public class HuskyYarnClient {
     opts.addOption("app_priority", true, "A number to indicate the priority of the husky application");
 
     opts.addOption("master", true, "Executable for c++ husky master (on local file system or HDFS)");
-    opts.addOption("application", true, "Executable for c++ husky worker (on local file system or HDFS)");
-    opts.addOption("config", true,
-        "Configuration file for c++ husky master and application (on local file system or HDFS)");
+    opts.addOption("worker", true, "Executable for c++ husky worker (on local file system or HDFS)");
+    opts.addOption("workers_info_file", true,
+        "Workers info file for c++ husky master and worker(on local file system or HDFS)");
     opts.addOption("worker_infos", true,
-        "Specified hosts that husky application will run on. Use comma(,) to split different archives.");
-    opts.addOption("ld_library_path", true,
-        "Path on datanodes where c++ husky master and application looks for their libraries");
-
-    opts.addOption("user_name", true, "Username used for kinit");
-    opts.addOption("key_tab", true,
-        "Path on DATANODEs to keytab file which is required by kinit to avoid security issues of HDFS");
-
+        "Specified hosts that husky worker will run on. Use comma(,) to split different archives.");
+    opts.addOption("master_port", true, "Husky master port");
+    opts.addOption("master_job_listener_port", true, "Husky master job listener port");
+    opts.addOption("hdfs_namenode_host", true, "HDFS Namenode host");
+    opts.addOption("hdfs_namenode_port", true, "HDFS Namenode port");
     opts.addOption("log_to_hdfs", true, "Path on HDFS where to upload logs of application master and worker containers");
     return opts;
   }
@@ -157,30 +152,6 @@ public class HuskyYarnClient {
     }
     LOG.info("Husky Application Master's jar is " + mAppMasterJar);
 
-    if (cliParser.hasOption("worker_infos")) {
-      for (String i : cliParser.getOptionValue("worker_infos").split(",")) {
-        String[] pair = i.trim().split(":");
-        if (pair.length != 2) {
-          throw new IllegalArgumentException("Invalid worker info: " + i.trim());
-        }
-        try {
-          Pair<String, Integer> p = new Pair<String, Integer>(pair[0], Integer.parseInt(pair[1]));
-          if (p.getSecond() <= 0) {
-            throw new IllegalArgumentException("Invalid worker info, number of worker should be large than 0: " + i.trim());
-          }
-          mWorkerInfos.add(p);
-        } catch (NumberFormatException e) {
-          LOG.log(Level.SEVERE, "Invalid number of worker given in worker_infos: " + i.trim());
-          throw e;
-        }
-      }
-      if (mWorkerInfos.isEmpty()) {
-        throw new IllegalArgumentException("Parameter `worker_infos` is empty.");
-      }
-    } else {
-      throw new IllegalArgumentException("No worker information is provided. Parameter `worker_infos` is not set.");
-    }
-
     mAppMasterMemory = Integer.parseInt(cliParser.getOptionValue("master_memory", "2048"));
     if (mAppMasterMemory <= 0) {
       throw new IllegalArgumentException(
@@ -210,19 +181,60 @@ public class HuskyYarnClient {
     }
     mMasterExec = cliParser.getOptionValue("master");
 
-    if (!cliParser.hasOption("application")) {
-      throw new IllegalArgumentException("No application specified for c++ husky workers");
+    if (!cliParser.hasOption("worker")) {
+      throw new IllegalArgumentException("No executable specified for c++ husky workers");
     }
-    mAppExec = cliParser.getOptionValue("application");
+    mWorkerExec = cliParser.getOptionValue("worker");
 
-    if (!cliParser.hasOption("config")) {
-      throw new IllegalArgumentException("No config file given for c++ husky master and application");
+    if (!cliParser.hasOption("workers_info_file")) {
+      throw new IllegalArgumentException("No workers info file given for c++ husky master and worker");
     }
-    mConfigFile = cliParser.getOptionValue("config");
-    mLdLibraryPath = cliParser.getOptionValue("ld_library_path", "");
+    mWorkersInfoFile = cliParser.getOptionValue("workers_info_file");
 
-    mKeyTabFile = cliParser.getOptionValue("key_tab", "");
-    mUserName = cliParser.getOptionValue("user_name", "");
+    if (cliParser.hasOption("worker_infos")) {
+      for (String i : cliParser.getOptionValue("worker_infos").split(",")) {
+        String[] pair = i.trim().split(":");
+        if (pair.length != 2) {
+          throw new IllegalArgumentException("Invalid worker info: " + i.trim());
+        }
+        try {
+          Pair<String, Integer> p = new Pair<String, Integer>(pair[0], Integer.parseInt(pair[1]));
+          if (p.getSecond() <= 0) {
+            throw new IllegalArgumentException("Invalid worker info, number of worker should be large than 0: " + i.trim());
+          }
+          mWorkerInfos.add(p);
+        } catch (NumberFormatException e) {
+          LOG.log(Level.SEVERE, "Invalid number of worker given in worker_infos: " + i.trim());
+          throw e;
+        }
+      }
+      if (mWorkerInfos.isEmpty()) {
+        throw new IllegalArgumentException("Parameter `worker_infos` is empty.");
+      }
+    } else {
+      throw new IllegalArgumentException("No worker information is provided. Parameter `worker_infos` is not set.");
+    }
+
+    if (!cliParser.hasOption("master_port")) {
+      throw new IllegalArgumentException("No port for c++ husky master");
+    }
+    mMasterPort = cliParser.getOptionValue("master_port");
+
+    if (!cliParser.hasOption("master_job_listener_port")) {
+      throw new IllegalArgumentException("No job listener port for c++ husky master");
+    }
+    mMasterJobListenerPort = cliParser.getOptionValue("master_job_listener_port");
+
+    if (!cliParser.hasOption("hdfs_namenode_host")) {
+      throw new IllegalArgumentException("No HDFS Namenode host");
+    }
+    mHdfsNameNodeHost = cliParser.getOptionValue("hdfs_namenode_host");
+
+    if (!cliParser.hasOption("hdfs_namenode_port")) {
+      throw new IllegalArgumentException("No HDFS Namenode port");
+    }
+    mHdfsNameNodePort = cliParser.getOptionValue("hdfs_namenode_port");
+
     mLogPathToHDFS = cliParser.getOptionValue("log_to_hdfs", "");
     if (!mLogPathToHDFS.isEmpty()) {
       if (!mFileSystem.isDirectory(new Path(mLogPathToHDFS))) {
@@ -290,27 +302,21 @@ public class HuskyYarnClient {
       mMasterExec = resource.getFirst();
       localResources.put("HuskyMasterExec", resource.getSecond());
 
-      resource = constructLocalResource("HuskyWorkerExec", mAppExec, FILE);
-      mAppExec = resource.getFirst();
-      localResources.put("HuskyAppExec", resource.getSecond());
+      resource = constructLocalResource("HuskyWorkerExec", mWorkerExec, FILE);
+      mWorkerExec = resource.getFirst();
+      localResources.put("HuskyWorkerExec", resource.getSecond());
 
-      resource = constructLocalResource("HuskyConfigFile", mConfigFile, FILE);
-      mConfigFile = resource.getFirst();
-      localResources.put("HuskyConfigFile", resource.getSecond());
+      resource = constructLocalResource("HuskyWorkersInfo", mWorkersInfoFile, FILE);
+      mWorkersInfoFile = resource.getFirst();
+      localResources.put("HuskyWorkersInfo", resource.getSecond());
 
       StringBuilder builder = new StringBuilder();
       for (String i : mLocalFiles.split(",")) { // single file
         i = i.trim();
         if (!i.isEmpty()) {
-          Path path = new Path(i);
-          RemoteIterator<LocatedFileStatus> fileIter = mFileSystem.listFiles(path, true);
-          while (fileIter.hasNext()) {
-            LocatedFileStatus s = fileIter.next();
-            String name = s.getPath().getName();
-            resource = constructLocalResource(name, s.getPath().toString(), FILE);
-            localResources.put(name, resource.getSecond());
-            builder.append(resource.getFirst()).append(',');
-          }
+          resource = constructLocalResource(i, i, FILE);
+          localResources.put(i, resource.getSecond());
+          builder.append(resource.getFirst()).append(',');
         }
       }
       builder.setLength(Math.max(0, builder.length() - 1));
@@ -353,7 +359,7 @@ public class HuskyYarnClient {
   private boolean monitorApp() throws YarnException, IOException {
     while (true) {
       try {
-        Thread.sleep(1000);
+        Thread.sleep(10000);  // 10 seconds
       } catch (InterruptedException ignore) {
       }
 
@@ -400,12 +406,6 @@ public class HuskyYarnClient {
     amContainer.setEnvironment(getEnvironment());
 
     StringBuilder cmdBuilder = new StringBuilder();
-    if (!mKeyTabFile.isEmpty()) {
-      if (mUserName.isEmpty()) {
-        throw new RuntimeException("Username is not given but is required by kinit");
-      }
-      cmdBuilder.append("kinit -kt ").append(mKeyTabFile).append(" -V ").append(mUserName).append(" && ");
-    }
     cmdBuilder.append(JAVA_HOME.$()).append("/bin/java")
         .append(" -Xmx").append(mAppMasterMemory).append("m ")
         .append(HuskyApplicationMaster.class.getName())
@@ -414,16 +414,17 @@ public class HuskyYarnClient {
         .append(" --app_priority ").append(mAppPriority)
         .append(" --app_master_log_dir <LOG_DIR>")
         .append(" --master ").append(mMasterExec)
-        .append(" --application ").append(mAppExec)
-        .append(" --config ").append(mConfigFile);
-    if (!mLdLibraryPath.isEmpty()) {
-      cmdBuilder.append(" --ld_library_path \"").append(mLdLibraryPath).append("\" ");
-    }
+        .append(" --worker ").append(mWorkerExec)
+        .append(" --workers_info_file ").append(mWorkersInfoFile)
+        .append(" --master_port ").append(mMasterPort)
+        .append(" --master_job_listener_port ").append(mMasterJobListenerPort)
+        .append(" --hdfs_namenode_host ").append(mHdfsNameNodeHost)
+        .append(" --hdfs_namenode_port ").append(mHdfsNameNodePort);
     cmdBuilder.append(" --worker_infos ").append(mWorkerInfos.get(0).getFirst())
-        .append(":").append(mWorkerInfos.get(0).getSecond());
+      .append(":").append(mWorkerInfos.get(0).getSecond());
     for (int i = 1; i < mWorkerInfos.size(); i++) {
       cmdBuilder.append(',').append(mWorkerInfos.get(i).getFirst())
-          .append(":").append(mWorkerInfos.get(i).getSecond());
+        .append(":").append(mWorkerInfos.get(i).getSecond());
     }
     if (!mLocalFiles.isEmpty()) {
       cmdBuilder.append(" --local_files \"").append(mLocalFiles).append("\"");

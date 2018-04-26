@@ -46,9 +46,6 @@ abstract class ContainerRunnable implements Runnable {
 
   protected Map<String, String> getShellEnv() {
     Map<String, String> map = new HashMap<String, String>();
-    if (!mAppMaster.getLdLibraryPath().isEmpty()) {
-      map.put("LD_LIBRARY_PATH", mAppMaster.getLdLibraryPath());
-    }
     return map;
   }
 
@@ -78,15 +75,25 @@ class HuskyWorker extends ContainerRunnable {
   protected List<String> getCommands() throws InterruptedException {
     ArrayList<String> commands = new ArrayList<String>();
     StringBuilder builder = new StringBuilder();
-    builder.append("./HuskyAppExec")
-        .append(" --conf HuskyConfigFile")
-        .append(" --master_host ").append(mAppMaster.getAppMasterHost())
-        .append(" --worker.info");
-    for (Pair<String, Integer> info : mAppMaster.getWorkerInfos()) {
-      builder.append(" ").append(info.getFirst()).append(':').append(info.getSecond());
-    }
+    builder.append("./HuskyWorkerExec")
+        .append(" --master_host=").append(mAppMaster.getAppMasterHost())
+        .append(" --master_port=").append(mAppMaster.getMasterPort())
+        .append(" --workers_info_path=./HuskyWorkersInfo")
+        .append(" --hdfs_namenode_host=").append(mAppMaster.getHdfsNameNodeHost())
+        .append(" --hdfs_namenode_port=").append(mAppMaster.getHdfsNameNodePort())
+        .append(" --workers_scratch_dir=./")
+        .append(" --log_dir=./")
+        .append(" --logtostderr=1")
+        .append(" --task_queue_flag=true");
 
     String containerHost = mContainer.getNodeId().getHost();
+    int processId = -1;
+    for (Pair<String, Integer> info : mAppMaster.getWorkerInfos()) {
+      if (info.getFirst().equals(containerHost)) 
+        processId = mAppMaster.getWorkerInfos().indexOf(info);
+    }
+    builder.append(" --process_id=").append(Integer.toString(processId));
+
     builder.append(" 1>").append("<LOG_DIR>/").append(containerHost).append(".stdout");
     builder.append(" 2>").append("<LOG_DIR>/").append(containerHost).append(".stderr");
     if (!mAppMaster.getLogPathToHDFS().isEmpty()) {

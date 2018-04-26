@@ -38,16 +38,16 @@ class HuskyMaster extends Thread {
     LOG.info("Constructing husky master starting command.");
     ArrayList<String> commands = new ArrayList<String>();
     commands.add("./HuskyMasterExec");
-    commands.add("--conf");
-    commands.add("HuskyConfigFile");
-    commands.add("--master_host");
-    commands.add(mAppMaster.getAppMasterHost());
-    commands.add("--worker.info");
-    for (Pair<String, Integer> info : mAppMaster.getWorkerInfos()) {
-      commands.add(info.getFirst() + ":" + info.getSecond());
-    }
-    commands.add("--serve");
-    commands.add("0");
+    commands.add("--master_host=" + mAppMaster.getAppMasterHost());
+    commands.add("--master_port=" + mAppMaster.getMasterPort());
+    commands.add("--master_job_listener_port=" + mAppMaster.getMasterJobListenerPort());
+    commands.add("--workers_info_path=./HuskyWorkersInfo");
+    commands.add("--master_husky_scratch_dir=./");
+    commands.add("--log_dir=./");
+    commands.add("--logtostderr=1");
+    commands.add("--worker_checkpoint_dir=./checkpoint");
+    commands.add("--enable_dashboard=false");
+    commands.add("--heartbeat_timeout=600");
     commands.add("1>" + mAppMaster.getAppMasterLogDir() + "/HuskyMaster.stdout");
     commands.add("2>" + mAppMaster.getAppMasterLogDir() + "/HuskyMaster.stderr");
     StringBuilder builder = new StringBuilder();
@@ -63,9 +63,6 @@ class HuskyMaster extends Thread {
     try {
       LOG.info("Starting husky master process");
       ProcessBuilder mHuskyMasterProcess = new ProcessBuilder(getCommands());
-      if (!mAppMaster.getLdLibraryPath().isEmpty()) {
-        mHuskyMasterProcess.environment().put("LD_LIBRARY_PATH", mAppMaster.getLdLibraryPath());
-      }
       mHuskyMasterProcess.redirectOutput(new File(mAppMaster.getAppMasterLogDir() + "/HuskyMaster.stdout"));
       mHuskyMasterProcess.redirectError(new File(mAppMaster.getAppMasterLogDir() + "/HuskyMaster.stderr"));
       Process p = mHuskyMasterProcess.start();

@@ -49,14 +49,17 @@ public class HuskyApplicationMaster {
   private String mLogPathToHDFS = "";
 
   private String mMasterExec = "";
-  private String mAppExec = "";
-  private String mConfigFile = "";
-  private String mLdLibraryPath = "";
+  private String mWorkerExec = "";
+  private String mWorkersInfoFile = "";
+  private ArrayList<Pair<String, Integer>> mWorkerInfos = new ArrayList<Pair<String, Integer>>();
+  private String mMasterPort = "";
+  private String mMasterJobListenerPort = "";
+  private String mHdfsNameNodeHost = "";
+  private String mHdfsNameNodePort = "";
 
   private int mContainerMemory = 0;
   private int mNumVirtualCores = 0;
   private int mAppPriority = 0;
-  private ArrayList<Pair<String, Integer>> mWorkerInfos = new ArrayList<Pair<String, Integer>>();
 
   private HuskyRMCallbackHandler mRMClientListener = null;
   private AMRMClientAsync<ContainerRequest> mRMClient = null;
@@ -76,16 +79,19 @@ public class HuskyApplicationMaster {
     opts.addOption("container_vcores", true, "Number of virtual cores to be requested to run a husky worker node");
     opts.addOption("app_priority", true, "A number to indicate the priority to run a husky worker node");
     opts.addOption("master", true, "Executable for c++ husky master");
-    opts.addOption("application", true, "Executable for c++ husky worker");
-    opts.addOption("config", true, "Configuration file for c++ husky master and application");
-    opts.addOption("ld_library_path", true,
-        "Path on datanodes where c++ husky master and application looks for their libraries");
+    opts.addOption("worker", true, "Executable for c++ husky worker");
+    opts.addOption("workers_info_file", true,
+        "Workers info file for c++ husky master and worker(on local file system or HDFS)");
+    opts.addOption("worker_infos", true,
+        "Specified hosts that husky worker will run on. Use comma(,) to split different archives.");
+    opts.addOption("master_port", true, "Husky master port");
+    opts.addOption("master_job_listener_port", true, "Husky master job listener port");
+    opts.addOption("hdfs_namenode_host", true, "HDFS Namenode host");
+    opts.addOption("hdfs_namenode_port", true, "HDFS Namenode port");
     opts.addOption("local_files", true,
         "Files that need to pass to working environment. Use comma(,) to split different files.");
     opts.addOption("local_archives", true,
         "Archives that need to pass to and be unarchived in working environment. Use comma(,) to split different archives.");
-    opts.addOption("worker_infos", true,
-        "Specified hosts that husky application will run on. Use comma(,) to split different archives.");
     opts.addOption("log_to_hdfs", true,
         "Path on HDFS where to upload the logs of worker nodes");
     return opts;
@@ -122,34 +128,15 @@ public class HuskyApplicationMaster {
     }
     mMasterExec = cliParser.getOptionValue("master");
 
-    if (!cliParser.hasOption("application")) {
-      throw new IllegalArgumentException("No application specified for c++ husky workers");
+    if (!cliParser.hasOption("worker")) {
+      throw new IllegalArgumentException("No executable specified for c++ husky workers");
     }
-    mAppExec = cliParser.getOptionValue("application");
+    mWorkerExec = cliParser.getOptionValue("worker");
 
-    if (cliParser.hasOption("config")) {
-      mConfigFile = cliParser.getOptionValue("config");
+    if (!cliParser.hasOption("workers_info_file")) {
+      throw new IllegalArgumentException("No workers info file given for c++ husky master and worker");
     }
-
-    mLdLibraryPath = cliParser.getOptionValue("ld_library_path", "");
-
-    mContainerMemory = Integer.parseInt(cliParser.getOptionValue("container_memory", "2048"));
-    if (mContainerMemory < 0) {
-      throw new IllegalArgumentException(
-          "Illegal memory specified for container. Specified memory: " + mContainerMemory);
-    }
-
-    mNumVirtualCores = Integer.parseInt(cliParser.getOptionValue("container_vcores", "1"));
-    if (mNumVirtualCores <= 0) {
-      throw new IllegalArgumentException(
-          "Illegal number of virtual cores specified for container. Specified number of vcores: " + mNumVirtualCores);
-    }
-
-    mAppPriority = Integer.parseInt(cliParser.getOptionValue("app_priority", "1"));
-    if (mAppPriority <= 0) {
-      throw new IllegalArgumentException(
-          "Illegal priority for husky application. Specified priority: " + mAppPriority);
-    }
+    mWorkersInfoFile = cliParser.getOptionValue("workers_info_file");
 
     if (cliParser.hasOption("worker_infos")) {
       for (String i : cliParser.getOptionValue("worker_infos").split(",")) {
@@ -173,6 +160,44 @@ public class HuskyApplicationMaster {
       }
     } else {
       throw new IllegalArgumentException("No worker information is provided. Parameter `worker_infos` is not set.");
+    }
+
+    if (!cliParser.hasOption("master_port")) {
+      throw new IllegalArgumentException("No port for c++ husky master");
+    }
+    mMasterPort = cliParser.getOptionValue("master_port");
+
+    if (!cliParser.hasOption("master_job_listener_port")) {
+      throw new IllegalArgumentException("No job listener port for c++ husky master");
+    }
+    mMasterJobListenerPort = cliParser.getOptionValue("master_job_listener_port");
+
+    if (!cliParser.hasOption("hdfs_namenode_host")) {
+      throw new IllegalArgumentException("No HDFS Namenode host");
+    }
+    mHdfsNameNodeHost = cliParser.getOptionValue("hdfs_namenode_host");
+
+    if (!cliParser.hasOption("hdfs_namenode_port")) {
+      throw new IllegalArgumentException("No HDFS Namenode port");
+    }
+    mHdfsNameNodePort = cliParser.getOptionValue("hdfs_namenode_port");
+
+    mContainerMemory = Integer.parseInt(cliParser.getOptionValue("container_memory", "2048"));
+    if (mContainerMemory < 0) {
+      throw new IllegalArgumentException(
+          "Illegal memory specified for container. Specified memory: " + mContainerMemory);
+    }
+
+    mNumVirtualCores = Integer.parseInt(cliParser.getOptionValue("container_vcores", "1"));
+    if (mNumVirtualCores <= 0) {
+      throw new IllegalArgumentException(
+          "Illegal number of virtual cores specified for container. Specified number of vcores: " + mNumVirtualCores);
+    }
+
+    mAppPriority = Integer.parseInt(cliParser.getOptionValue("app_priority", "1"));
+    if (mAppPriority <= 0) {
+      throw new IllegalArgumentException(
+          "Illegal priority for husky application. Specified priority: " + mAppPriority);
     }
 
     return true;
@@ -249,10 +274,6 @@ public class HuskyApplicationMaster {
     return mNMClient;
   }
 
-  public ArrayList<Pair<String, Integer>> getWorkerInfos() {
-    return mWorkerInfos;
-  }
-
   public HuskyNMCallbackHandler getContainerListener() {
     return mContainerListener;
   }
@@ -265,12 +286,8 @@ public class HuskyApplicationMaster {
     return mMasterExec;
   }
 
-  public String getAppExec() {
-    return mAppExec;
-  }
-
-  public String getConfigFile() {
-    return mConfigFile;
+  public String getWorkerExec() {
+    return mWorkerExec;
   }
 
   public String getLocalFiles() {
@@ -281,8 +298,28 @@ public class HuskyApplicationMaster {
     return mLocalArchives;
   }
 
-  public String getLdLibraryPath() {
-    return mLdLibraryPath;
+  public String getWorkersInfoFile() {
+    return mWorkersInfoFile;
+  }
+
+  public ArrayList<Pair<String, Integer>> getWorkerInfos() {
+    return mWorkerInfos;
+  }
+
+  public String getMasterPort() {
+    return mMasterPort;
+  }
+
+  public String getMasterJobListenerPort() {
+    return mMasterJobListenerPort;
+  }
+
+  public String getHdfsNameNodeHost() {
+    return mHdfsNameNodeHost;
+  }
+
+  public String getHdfsNameNodePort() {
+    return mHdfsNameNodePort;
   }
 
   public String getAppMasterHost() {

@@ -130,13 +130,13 @@ public class HuskyRMCallbackHandler implements AMRMClientAsync.CallbackHandler {
     if (!path.startsWith("hdfs://")) {
       throw new RuntimeException("Local resources provided to application master must be already located on HDFS.");
     }
-    FileStatus dsfStaus = mAppMaster.getFileSystem().getFileStatus(new Path(path));
+    FileStatus dfsStatus = mAppMaster.getFileSystem().getFileStatus(new Path(path));
     LocalResource resource = Records.newRecord(LocalResource.class);
     resource.setType(type);
     resource.setVisibility(LocalResourceVisibility.APPLICATION);
     resource.setResource(ConverterUtils.getYarnUrlFromPath(new Path(path)));
-    resource.setTimestamp(dsfStaus.getModificationTime());
-    resource.setSize(dsfStaus.getLen());
+    resource.setTimestamp(dfsStatus.getModificationTime());
+    resource.setSize(dfsStatus.getLen());
     return resource;
   }
 
@@ -144,8 +144,9 @@ public class HuskyRMCallbackHandler implements AMRMClientAsync.CallbackHandler {
     localResources = new HashMap<String, LocalResource>();
 
     try {
-      String[][] resources = {{"HuskyAppExec", mAppMaster.getAppExec()},
-          {"HuskyMasterExec", mAppMaster.getMasterExec()}, {"HuskyConfigFile", mAppMaster.getConfigFile()}};
+      String[][] resources = {{"HuskyMasterExec", mAppMaster.getMasterExec()},
+          {"HuskyWorkerExec", mAppMaster.getWorkerExec()},
+          {"HuskyWorkersInfo", mAppMaster.getWorkersInfoFile()}};
 
       for (String[] resource : resources) {
         LocalResource lr = constructLocalResource(resource[0], resource[1], LocalResourceType.FILE);
