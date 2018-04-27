@@ -77,8 +77,6 @@ public class HuskyYarnClient {
   private String mWorkerExec = "";
   private String mWorkersInfoFile = "";
   private ArrayList<Pair<String, Integer>> mWorkerInfos = new ArrayList<Pair<String, Integer>>();
-  private String mMasterPort = "";
-  private String mMasterJobListenerPort = "";
   private String mHdfsNameNodeHost = "";
   private String mHdfsNameNodePort = "";
   private String mLogPathToHDFS = "";
@@ -115,8 +113,6 @@ public class HuskyYarnClient {
         "Workers info file for c++ husky master and worker(on local file system or HDFS)");
     opts.addOption("worker_infos", true,
         "Specified hosts that husky worker will run on. Use comma(,) to split different archives.");
-    opts.addOption("master_port", true, "Husky master port");
-    opts.addOption("master_job_listener_port", true, "Husky master job listener port");
     opts.addOption("hdfs_namenode_host", true, "HDFS Namenode host");
     opts.addOption("hdfs_namenode_port", true, "HDFS Namenode port");
     opts.addOption("log_to_hdfs", true, "Path on HDFS where to upload logs of application master and worker containers");
@@ -214,16 +210,6 @@ public class HuskyYarnClient {
     } else {
       throw new IllegalArgumentException("No worker information is provided. Parameter `worker_infos` is not set.");
     }
-
-    if (!cliParser.hasOption("master_port")) {
-      throw new IllegalArgumentException("No port for c++ husky master");
-    }
-    mMasterPort = cliParser.getOptionValue("master_port");
-
-    if (!cliParser.hasOption("master_job_listener_port")) {
-      throw new IllegalArgumentException("No job listener port for c++ husky master");
-    }
-    mMasterJobListenerPort = cliParser.getOptionValue("master_job_listener_port");
 
     if (!cliParser.hasOption("hdfs_namenode_host")) {
       throw new IllegalArgumentException("No HDFS Namenode host");
@@ -416,8 +402,6 @@ public class HuskyYarnClient {
         .append(" --master ").append(mMasterExec)
         .append(" --worker ").append(mWorkerExec)
         .append(" --workers_info_file ").append(mWorkersInfoFile)
-        .append(" --master_port ").append(mMasterPort)
-        .append(" --master_job_listener_port ").append(mMasterJobListenerPort)
         .append(" --hdfs_namenode_host ").append(mHdfsNameNodeHost)
         .append(" --hdfs_namenode_port ").append(mHdfsNameNodePort);
     cmdBuilder.append(" --worker_infos ").append(mWorkerInfos.get(0).getFirst())

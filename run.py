@@ -36,8 +36,6 @@ if __name__ == '__main__':
 -worker {} \
 -workers_info_file {} \
 -worker_infos {} \
--master_port 14818 \
--master_job_listener_port 14717 \
 -local_files {} \
 -hdfs_namenode_host proj10 \
 -hdfs_namenode_port 9000 \

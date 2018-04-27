@@ -31,6 +31,7 @@ import org.apache.hadoop.yarn.util.Records;
 
 import java.io.IOException;
 import java.net.InetAddress;
+import java.net.ServerSocket;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.concurrent.ExecutionException;
@@ -84,8 +85,6 @@ public class HuskyApplicationMaster {
         "Workers info file for c++ husky master and worker(on local file system or HDFS)");
     opts.addOption("worker_infos", true,
         "Specified hosts that husky worker will run on. Use comma(,) to split different archives.");
-    opts.addOption("master_port", true, "Husky master port");
-    opts.addOption("master_job_listener_port", true, "Husky master job listener port");
     opts.addOption("hdfs_namenode_host", true, "HDFS Namenode host");
     opts.addOption("hdfs_namenode_port", true, "HDFS Namenode port");
     opts.addOption("local_files", true,
@@ -162,16 +161,6 @@ public class HuskyApplicationMaster {
       throw new IllegalArgumentException("No worker information is provided. Parameter `worker_infos` is not set.");
     }
 
-    if (!cliParser.hasOption("master_port")) {
-      throw new IllegalArgumentException("No port for c++ husky master");
-    }
-    mMasterPort = cliParser.getOptionValue("master_port");
-
-    if (!cliParser.hasOption("master_job_listener_port")) {
-      throw new IllegalArgumentException("No job listener port for c++ husky master");
-    }
-    mMasterJobListenerPort = cliParser.getOptionValue("master_job_listener_port");
-
     if (!cliParser.hasOption("hdfs_namenode_host")) {
       throw new IllegalArgumentException("No HDFS Namenode host");
     }
@@ -199,6 +188,18 @@ public class HuskyApplicationMaster {
       throw new IllegalArgumentException(
           "Illegal priority for husky application. Specified priority: " + mAppPriority);
     }
+
+    mMasterPort = Integer.toString(getAvaiablePort());
+    if (mMasterPort.isEmpty()) {
+      throw new IllegalArgumentException("Invalid port for husky master");
+    }
+    LOG.info("Get husky master port" + mMasterPort);
+
+    mMasterJobListenerPort = Integer.toString(getAvaiablePort());
+    if (mMasterJobListenerPort.isEmpty()) {
+      throw new IllegalArgumentException("Invalid job listener port for husky master");
+    }
+    LOG.info("Get husky master job listener port" + mMasterJobListenerPort);
 
     return true;
   }
@@ -261,6 +262,28 @@ public class HuskyApplicationMaster {
     System.exit(0);
   }
 
+  protected int getAvaiablePort() {
+    ServerSocket socket = null;
+    try {
+      socket = new ServerSocket(0);
+      socket.setReuseAddress(true);
+      int port = socket.getLocalPort();
+      try {
+        socket.close();
+      } catch (IOException e) {
+      }
+      return port;
+    } catch (IOException e) { 
+    } finally {
+      if (socket != null) {
+        try {
+          socket.close();
+        } catch (IOException e) {
+        }
+      }
+    }
+    throw new IllegalStateException("Could not find a free TCP/IP port");
+  }
 
   public FileSystem getFileSystem() {
     return mFileSystem;
