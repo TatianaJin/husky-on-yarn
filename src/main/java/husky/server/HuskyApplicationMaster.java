@@ -57,6 +57,7 @@ public class HuskyApplicationMaster {
   private String mMasterJobListenerPort = "";
   private String mHdfsNameNodeHost = "";
   private String mHdfsNameNodePort = "";
+  private String mJobArgs = null;
 
   private int mContainerMemory = 0;
   private int mNumVirtualCores = 0;
@@ -93,6 +94,8 @@ public class HuskyApplicationMaster {
         "Archives that need to pass to and be unarchived in working environment. Use comma(,) to split different archives.");
     opts.addOption("log_to_hdfs", true,
         "Path on HDFS where to upload the logs of worker nodes");
+    opts.addOption("job_args", true,
+        "Job arguments if the job is to be submitted to husky master immediately.");
     return opts;
   }
 
@@ -170,6 +173,11 @@ public class HuskyApplicationMaster {
       throw new IllegalArgumentException("No HDFS Namenode port");
     }
     mHdfsNameNodePort = cliParser.getOptionValue("hdfs_namenode_port");
+
+    if (cliParser.hasOption("job_args")) {
+      mJobArgs = cliParser.getOptionValue("job_args");
+      LOG.info("Job args: " + mJobArgs);
+    }
 
     mContainerMemory = Integer.parseInt(cliParser.getOptionValue("container_memory", "2048"));
     if (mContainerMemory < 0) {
@@ -343,6 +351,10 @@ public class HuskyApplicationMaster {
 
   public String getHdfsNameNodePort() {
     return mHdfsNameNodePort;
+  }
+
+  public String getJobArgs() {
+    return mJobArgs;
   }
 
   public String getAppMasterHost() {

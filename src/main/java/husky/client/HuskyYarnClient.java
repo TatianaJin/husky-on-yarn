@@ -79,6 +79,7 @@ public class HuskyYarnClient {
   private ArrayList<Pair<String, Integer>> mWorkerInfos = new ArrayList<Pair<String, Integer>>();
   private String mHdfsNameNodeHost = "";
   private String mHdfsNameNodePort = "";
+  private String mJobArgs = null;
   private String mLogPathToHDFS = "";
 
   public HuskyYarnClient() throws IOException {
@@ -115,6 +116,7 @@ public class HuskyYarnClient {
         "Specified hosts that husky worker will run on. Use comma(,) to split different archives.");
     opts.addOption("hdfs_namenode_host", true, "HDFS Namenode host");
     opts.addOption("hdfs_namenode_port", true, "HDFS Namenode port");
+    opts.addOption("job_args", true, "Job arguments if submit. The first is job name");
     opts.addOption("log_to_hdfs", true, "Path on HDFS where to upload logs of application master and worker containers");
     return opts;
   }
@@ -220,6 +222,11 @@ public class HuskyYarnClient {
       throw new IllegalArgumentException("No HDFS Namenode port");
     }
     mHdfsNameNodePort = cliParser.getOptionValue("hdfs_namenode_port");
+
+    if (cliParser.hasOption("job_args")) {
+      mJobArgs = cliParser.getOptionValue("job_args");
+      LOG.info("Job args: " + mJobArgs);
+    }
 
     mLogPathToHDFS = cliParser.getOptionValue("log_to_hdfs", "");
     if (!mLogPathToHDFS.isEmpty()) {
@@ -404,6 +411,8 @@ public class HuskyYarnClient {
         .append(" --workers_info_file ").append(mWorkersInfoFile)
         .append(" --hdfs_namenode_host ").append(mHdfsNameNodeHost)
         .append(" --hdfs_namenode_port ").append(mHdfsNameNodePort);
+    if (mJobArgs != null)
+        cmdBuilder.append(" --job_args ").append(mJobArgs);
     cmdBuilder.append(" --worker_infos ").append(mWorkerInfos.get(0).getFirst())
       .append(":").append(mWorkerInfos.get(0).getSecond());
     for (int i = 1; i < mWorkerInfos.size(); i++) {

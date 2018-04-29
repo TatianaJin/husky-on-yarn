@@ -47,7 +47,7 @@ class HuskyMaster extends Thread {
     commands.add("--logtostderr=1");
     commands.add("--worker_checkpoint_dir=./checkpoint");
     commands.add("--enable_dashboard=false");
-    commands.add("--heartbeat_timeout=600");
+    commands.add("--heartbeat_timeout=60000");
     commands.add("1>" + mAppMaster.getAppMasterLogDir() + "/HuskyMaster.stdout");
     commands.add("2>" + mAppMaster.getAppMasterLogDir() + "/HuskyMaster.stderr");
     StringBuilder builder = new StringBuilder();
