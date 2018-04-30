@@ -22,6 +22,7 @@ import org.apache.hadoop.yarn.client.api.async.AMRMClientAsync;
 import org.apache.hadoop.yarn.util.ConverterUtils;
 import org.apache.hadoop.yarn.util.Records;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -34,6 +35,7 @@ public class HuskyRMCallbackHandler implements AMRMClientAsync.CallbackHandler {
   private static final Logger LOG = Logger.getLogger(HuskyRMCallbackHandler.class.getName());
 
   private Thread masterThread = null;
+  private Thread jobSubmissionThread = null;
   private ArrayList<Thread> mContainerThreads = new ArrayList<Thread>();
   private int mNumCompletedContainers = 0;
   private int mNumContainers = 0;
@@ -59,6 +61,11 @@ public class HuskyRMCallbackHandler implements AMRMClientAsync.CallbackHandler {
     mNumContainers = mAppMaster.getWorkerInfos().size();
     masterThread = new HuskyMaster(master);
     masterThread.start();
+
+    if (mAppMaster.getJobArgs() != null) {
+      jobSubmissionThread = new JobSubmission(mAppMaster);
+      jobSubmissionThread.start();
+    }
   }
 
   public float getProgress() {

@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import os
 import struct
 import sys
@@ -10,6 +12,7 @@ gflags.DEFINE_string('master_host', '', 'H4 Master Host')
 gflags.DEFINE_string('job_port', '', 'H4 Master Job Listener Port')
 gflags.DEFINE_string('job_name', '', 'H4 Master Job Name')
 gflags.DEFINE_string('job_args', None, 'H4 Master Job Arguments')
+gflags.DEFINE_boolean('shutdown', False, 'Shutdown after job completion')
 gflags.DEFINE_boolean('kill', False, 'Shutdown H4 on Yarn')
 
 gflags.FLAGS(sys.argv)
@@ -44,6 +47,7 @@ def submit_job():
         sock.send(pack(gflags.FLAGS.job_args, mode='str'))
     else:
         sock.send(pack(b"", mode='str'))
+    sock.send(pack(int(gflags.FLAGS.shutdown), mode='int'))
     print "[Done] Submit job {} to H4 on yarn".format(gflags.FLAGS.job_name)
 
 def shutdown():
