@@ -45,8 +45,10 @@ abstract class ContainerRunnable implements Runnable {
   }
 
   protected Map<String, String> getShellEnv() {
-    Map<String, String> map = new HashMap<String, String>();
-    return map;
+    Map<String, String> env = new HashMap<>();
+    env.put("LD_LIBRARY_PATH", "/data/opt/lib:/data/opt/brew/lib:/usr/local/lib:/lib64:/usr/lib64:/data/opt/jdk1.8.0_60/jre/lib/amd64/server:/data/opt/hadoop-2.6.0/lib/native");
+    env.put("LIBHDFS3_CONF", "/data/opt/hadoop-2.6.0/etc/hadoop/hdfs-client.xml");
+    return env;
   }
 
   protected abstract List<String> getCommands() throws Exception;

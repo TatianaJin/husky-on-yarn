@@ -346,7 +346,11 @@ public class HuskyYarnClient {
     for (String s : paths) {
       classpath.append(":").append(s);
     }
-    return Collections.singletonMap("CLASSPATH", classpath.toString());
+    Map<String, String> env = new HashMap<>();
+    env.put("CLASSPATH", classpath.toString());
+    env.put("LD_LIBRARY_PATH", "/data/opt/lib:/data/opt/brew/lib:/usr/local/lib:/lib64:/usr/lib64:/data/opt/jdk1.8.0_60/jre/lib/amd64/server:/data/opt/hadoop-2.6.0/lib/native");
+    env.put("LIBHDFS3_CONF", "/data/opt/hadoop-2.6.0/etc/hadoop/hdfs-client.xml");
+    return env;
   }
 
   private boolean monitorApp() throws YarnException, IOException {
